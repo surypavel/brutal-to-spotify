@@ -179,14 +179,20 @@ function App() {
 
   // When updating an already-created playlist, default checkboxes to whatever's already in it
   // rather than to "all checked" — otherwise re-visiting a friend would re-add tracks they removed.
+  //
+  // staleTime: 0 overrides the app-wide 1hr default (main.tsx) — that default suits the festival
+  // artist/favourites data, which barely changes, but this query's entire point is to reflect the
+  // playlist's *current* contents, so a persisted-cache hit must always be revalidated, never
+  // trusted as "fresh" on its own.
   const existingPlaylistTracksQuery = useQuery({
     queryKey: ['playlistTrackUris', existingPlaylist?.id],
     queryFn: () => spotifyApi.getPlaylistTrackUris(existingPlaylist!.id),
     enabled: step === 'preview' && Boolean(existingPlaylist),
+    staleTime: 0,
   })
 
   const isResolvingTracks =
-    spotifyMatches.some((query) => query.isLoading) || (Boolean(existingPlaylist) && existingPlaylistTracksQuery.isLoading)
+    spotifyMatches.some((query) => query.isLoading) || (Boolean(existingPlaylist) && existingPlaylistTracksQuery.isFetching)
 
   // react-query's cache is persisted to localStorage as JSON, so data read back from it may not
   // match this query's current return shape (e.g. an older build of this app cached a Set here,
@@ -197,9 +203,10 @@ function App() {
   }, [existingPlaylistTracksQuery.data])
 
   useEffect(() => {
-    // Wait only while the existing-playlist lookup is actually in flight — if it errors, fall
-    // through and default to checked rather than blocking every checkbox default forever.
-    if (existingPlaylist && existingPlaylistTracksQuery.isPending) return
+    // Wait for the lookup's current fetch attempt to fully settle (not just isPending, since
+    // stale cached data reports isSuccess immediately while revalidating in the background) — if
+    // it errors, fall through and default to checked rather than blocking every default forever.
+    if (existingPlaylist && existingPlaylistTracksQuery.isFetching) return
     const newUris = resolvedTrackUris.filter((uri) => !knownTrackUrisRef.current.has(uri))
     if (newUris.length === 0) return
     newUris.forEach((uri) => knownTrackUrisRef.current.add(uri))
@@ -211,7 +218,7 @@ function App() {
       }
       return next
     })
-  }, [resolvedTrackUris, existingPlaylist, existingPlaylistTrackUris, existingPlaylistTracksQuery.isPending, existingPlaylistTracksQuery.isSuccess])
+  }, [resolvedTrackUris, existingPlaylist, existingPlaylistTrackUris, existingPlaylistTracksQuery.isFetching, existingPlaylistTracksQuery.isSuccess])
 
   const checkedTrackUris = resolvedTrackUris.filter((uri) => selectedTrackUris.has(uri))
 
@@ -317,10 +324,6 @@ function App() {
             >
               Connect Spotify
             </Button>
-
-            <Button variant="subtle" onClick={backToScan}>
-              Cancel
-            </Button>
           </Stack>
         )}
 
@@ -398,21 +401,6 @@ function App() {
               </Alert>
             )}
 
-            <Button
-              variant="subtle"
-              size="xs"
-              c="dimmed"
-              onClick={() => {
-                spotifyAuth.logout()
-                setLoggedIn(false)
-              }}
-            >
-              Disconnect Spotify
-            </Button>
-
-            <Button variant="subtle" onClick={backToScan}>
-              Start over
-            </Button>
           </Stack>
         )}
 
