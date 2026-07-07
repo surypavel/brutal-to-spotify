@@ -99,12 +99,6 @@ with itself across reloads, so don't switch between them mid-session).
 The dev server proxies `/festival-api` to `https://admin.best4fest.app` (see `vite.config.ts`), so you don't
 need the Cloudflare Worker running locally.
 
-### Testing tools
-
-The "Testing tools" panel at the bottom of the page (`src/components/MyQrCode.tsx`) generates a throwaway
-identity's QR code and lets you assign it some favourite artists — useful for testing the scan/redeem flow with
-two browser profiles/tabs, without needing a phone or a friend.
-
 ## Deploying
 
 ### 1. Deploy the CORS proxy (Cloudflare Worker)
