@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { getValidAccessToken } from './spotifyAuth'
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -83,4 +84,29 @@ export async function replacePlaylistTracks(playlistId: string, uris: string[]):
   if (uris.length > 100) {
     await addTracksToPlaylist(playlistId, uris.slice(100))
   }
+}
+
+interface PlaylistItemsPage {
+  items: { item: { uri: string } | null }[]
+  next: string | null
+}
+
+// Shape of getPlaylistTrackUris's result, exported so callers can validate it after reading it back
+// out of react-query's localStorage-persisted cache (which may hold a stale/incompatible shape from
+// a previous build of this app).
+export const playlistTrackUrisSchema = z.array(z.string())
+
+// The newer /items path (unlike the deprecated /tracks path it replaces) nests each track under
+// an "item" key, not "track".
+export async function getPlaylistTrackUris(playlistId: string): Promise<string[]> {
+  const uris: string[] = []
+  let path: string | null = `/playlists/${playlistId}/items?fields=items(item(uri)),next&limit=100`
+  while (path) {
+    const data: PlaylistItemsPage = await apiFetch(path)
+    for (const entry of data.items) {
+      if (entry.item) uris.push(entry.item.uri)
+    }
+    path = data.next ? data.next.replace('https://api.spotify.com/v1', '') : null
+  }
+  return uris
 }

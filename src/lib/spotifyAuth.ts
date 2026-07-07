@@ -4,7 +4,7 @@ const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined
 const REDIRECT_URI =
   (import.meta.env.VITE_SPOTIFY_REDIRECT_URI as string | undefined) ??
   new URL(import.meta.env.BASE_URL, window.location.origin).toString()
-const SCOPES = ['playlist-modify-public', 'playlist-modify-private'].join(' ')
+const SCOPES = ['playlist-modify-public', 'playlist-modify-private', 'playlist-read-private'].join(' ')
 
 const VERIFIER_KEY = 'spotify_code_verifier'
 const TOKEN_KEY = 'spotify_token'

@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
-import { Alert, Anchor, Badge, Button, Container, Group, List, Loader, Stack, Text, Title } from '@mantine/core'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Alert, Anchor, Badge, Button, Checkbox, Container, Group, Loader, Stack, Text, Title } from '@mantine/core'
 import { IconBrandSpotify, IconMusic } from '@tabler/icons-react'
 import { QrScanner } from './components/QrScanner'
-import { ArtistReview, type ReviewArtist } from './components/ArtistReview'
 import { parseFestivalQrCode } from './lib/festivalQrCode'
 import {
   fetchArtists,
@@ -17,7 +16,12 @@ import { clearCurrentFriend, getCurrentFriend, setCurrentFriend, setCurrentFrien
 import * as spotifyAuth from './lib/spotifyAuth'
 import * as spotifyApi from './lib/spotifyApi'
 
-type Step = 'scan' | 'review' | 'connect' | 'preview'
+type Step = 'scan' | 'connect' | 'preview'
+
+interface ReviewArtist {
+  id: number
+  name: string
+}
 
 interface ScannedFriend {
   identity: string
@@ -63,6 +67,8 @@ function App() {
   const [step, setStep] = useState<Step>('scan')
   const [scanned, setScanned] = useState<ScannedFriend | null>(null)
   const [selectedArtists, setSelectedArtists] = useState<ReviewArtist[]>([])
+  const [selectedTrackUris, setSelectedTrackUris] = useState<Set<string>>(new Set())
+  const knownTrackUrisRef = useRef<Set<string>>(new Set())
 
   const [loggedIn, setLoggedIn] = useState(spotifyAuth.isLoggedIn())
   const [authError, setAuthError] = useState<string | null>(null)
@@ -97,7 +103,7 @@ function App() {
         const artists = await queryClient.fetchQuery({ queryKey: ARTISTS_QUERY_KEY, queryFn: fetchArtists })
         const resolved = resolveArtistNames(favouriteIds, artists)
         setScanned({ identity: currentFriend.identity, friendName: currentFriend.name, artists: resolved })
-        setStep('review')
+        selectArtistsAndProceed(resolved)
       } catch (err) {
         setAuthError(err instanceof Error ? err.message : String(err))
       }
@@ -122,13 +128,24 @@ function App() {
     onSuccess: (result) => {
       setCurrentFriend(result.identity, result.friendName)
       setScanned(result)
-      setStep('review')
+      selectArtistsAndProceed(result.artists)
     },
   })
 
-  function handleConfirmArtists(confirmed: ReviewArtist[]) {
-    setSelectedArtists(confirmed)
+  function selectArtistsAndProceed(artists: ReviewArtist[]) {
+    setSelectedArtists(artists)
+    setSelectedTrackUris(new Set())
+    knownTrackUrisRef.current = new Set()
     setStep(loggedIn ? 'preview' : 'connect')
+  }
+
+  function toggleTrack(uri: string) {
+    setSelectedTrackUris((prev) => {
+      const next = new Set(prev)
+      if (next.has(uri)) next.delete(uri)
+      else next.add(uri)
+      return next
+    })
   }
 
   function connectSpotify() {
@@ -153,20 +170,57 @@ function App() {
     })),
   })
 
-  const isResolvingTracks = spotifyMatches.some((query) => query.isLoading)
   const resolvedTrackUris = spotifyMatches.flatMap((query) => query.data?.tracks.map((track) => track.uri) ?? [])
   const currentFriendStored = scanned ? getCurrentFriend() : null
-  const existingPlaylist =
-    currentFriendStored?.playlistId && currentFriendStored.playlistUrl
-      ? { id: currentFriendStored.playlistId, url: currentFriendStored.playlistUrl }
-      : null
+  const existingPlaylist = useMemo(() => {
+    if (!currentFriendStored?.playlistId || !currentFriendStored.playlistUrl) return null
+    return { id: currentFriendStored.playlistId, url: currentFriendStored.playlistUrl }
+  }, [currentFriendStored?.playlistId, currentFriendStored?.playlistUrl])
+
+  // When updating an already-created playlist, default checkboxes to whatever's already in it
+  // rather than to "all checked" — otherwise re-visiting a friend would re-add tracks they removed.
+  const existingPlaylistTracksQuery = useQuery({
+    queryKey: ['playlistTrackUris', existingPlaylist?.id],
+    queryFn: () => spotifyApi.getPlaylistTrackUris(existingPlaylist!.id),
+    enabled: step === 'preview' && Boolean(existingPlaylist),
+  })
+
+  const isResolvingTracks =
+    spotifyMatches.some((query) => query.isLoading) || (Boolean(existingPlaylist) && existingPlaylistTracksQuery.isLoading)
+
+  // react-query's cache is persisted to localStorage as JSON, so data read back from it may not
+  // match this query's current return shape (e.g. an older build of this app cached a Set here,
+  // which round-trips through JSON as `{}`) — validate before trusting it.
+  const existingPlaylistTrackUris = useMemo(() => {
+    const parsed = spotifyApi.playlistTrackUrisSchema.safeParse(existingPlaylistTracksQuery.data)
+    return new Set(parsed.success ? parsed.data : [])
+  }, [existingPlaylistTracksQuery.data])
+
+  useEffect(() => {
+    // Wait only while the existing-playlist lookup is actually in flight — if it errors, fall
+    // through and default to checked rather than blocking every checkbox default forever.
+    if (existingPlaylist && existingPlaylistTracksQuery.isPending) return
+    const newUris = resolvedTrackUris.filter((uri) => !knownTrackUrisRef.current.has(uri))
+    if (newUris.length === 0) return
+    newUris.forEach((uri) => knownTrackUrisRef.current.add(uri))
+    setSelectedTrackUris((prev) => {
+      const next = new Set(prev)
+      for (const uri of newUris) {
+        const checkedByDefault = existingPlaylist && existingPlaylistTracksQuery.isSuccess ? existingPlaylistTrackUris.has(uri) : true
+        if (checkedByDefault) next.add(uri)
+      }
+      return next
+    })
+  }, [resolvedTrackUris, existingPlaylist, existingPlaylistTrackUris, existingPlaylistTracksQuery.isPending, existingPlaylistTracksQuery.isSuccess])
+
+  const checkedTrackUris = resolvedTrackUris.filter((uri) => selectedTrackUris.has(uri))
 
   const playlistMutation = useMutation({
     mutationFn: async () => {
       if (!scanned) throw new Error('No friend selected')
-      if (resolvedTrackUris.length === 0) throw new Error('No tracks were found for any of the artists.')
+      if (checkedTrackUris.length === 0) throw new Error('No tracks selected.')
       if (existingPlaylist) {
-        await spotifyApi.replacePlaylistTracks(existingPlaylist.id, resolvedTrackUris)
+        await spotifyApi.replacePlaylistTracks(existingPlaylist.id, checkedTrackUris)
         return existingPlaylist
       }
       const playlist = await spotifyApi.createPlaylist(
@@ -177,7 +231,7 @@ function App() {
       // Persist before adding tracks: if that step fails, a retry should replace items on this
       // already-created playlist rather than creating another orphaned empty one.
       setCurrentFriendPlaylist(stored.id, stored.url)
-      await spotifyApi.addTracksToPlaylist(playlist.id, resolvedTrackUris)
+      await spotifyApi.addTracksToPlaylist(playlist.id, checkedTrackUris)
       return stored
     },
   })
@@ -186,6 +240,8 @@ function App() {
     setStep('scan')
     setScanned(null)
     setSelectedArtists([])
+    setSelectedTrackUris(new Set())
+    knownTrackUrisRef.current = new Set()
     scanMutation.reset()
     playlistMutation.reset()
   }
@@ -236,15 +292,6 @@ function App() {
               <QrScanner onScan={(text) => scanMutation.mutate(text)} />
             )}
           </Stack>
-        )}
-
-        {step === 'review' && scanned && (
-          <ArtistReview
-            friendName={scanned.friendName}
-            artists={scanned.artists}
-            onConfirm={handleConfirmArtists}
-            onRescan={backToScan}
-          />
         )}
 
         {step === 'connect' && (
@@ -311,11 +358,17 @@ function App() {
                         )}
                     </Group>
                     {data && data.tracks.length > 0 && (
-                      <List size="sm" spacing={2} ml="md">
+                      <Stack gap={2} ml="md">
                         {data.tracks.map((track) => (
-                          <List.Item key={track.id}>{track.name}</List.Item>
+                          <Checkbox
+                            key={track.id}
+                            size="sm"
+                            label={track.name}
+                            checked={selectedTrackUris.has(track.uri)}
+                            onChange={() => toggleTrack(track.uri)}
+                          />
                         ))}
-                      </List>
+                      </Stack>
                     )}
                   </div>
                 )
@@ -327,10 +380,10 @@ function App() {
                 leftSection={<IconBrandSpotify size={16} />}
                 onClick={() => playlistMutation.mutate()}
                 loading={playlistMutation.isPending}
-                disabled={resolvedTrackUris.length === 0}
+                disabled={checkedTrackUris.length === 0}
               >
-                {existingPlaylist ? 'Update playlist' : 'Create playlist'} ({resolvedTrackUris.length} track
-                {resolvedTrackUris.length === 1 ? '' : 's'})
+                {existingPlaylist ? 'Update playlist' : 'Create playlist'} ({checkedTrackUris.length} track
+                {checkedTrackUris.length === 1 ? '' : 's'})
               </Button>
             )}
 
