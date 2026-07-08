@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -9,8 +9,28 @@
 body {
   margin: 0;
   min-height: 100svh;
+  background-color: #0f0d0a;
+  /* Warm gold glow up top (Brutal Assault), faint green rising from the bottom corner (Spotify). */
+  background-image:
+    radial-gradient(120% 60% at 50% -10%, rgba(237, 168, 18, 0.14), transparent 65%),
+    radial-gradient(80% 50% at 90% 115%, rgba(29, 185, 84, 0.1), transparent 70%);
+  background-attachment: fixed;
 }
 
 #root {
   min-height: 100svh;
+}
+
+.brand-gold {
+  background: linear-gradient(135deg, #f8d477 0%, #eda812 55%, #c97e08 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.brand-green {
+  background: linear-gradient(135deg, #4be18a 0%, #1db954 70%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }

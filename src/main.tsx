@@ -7,6 +7,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import '@mantine/core/styles.css'
 import './index.css'
 import App from './App.tsx'
+import { theme } from './theme'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,7 +25,7 @@ const persister = createAsyncStoragePersister({ storage: window.localStorage })
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>
-      <MantineProvider defaultColorScheme="auto">
+      <MantineProvider theme={theme} forceColorScheme="dark">
         <App />
       </MantineProvider>
     </PersistQueryClientProvider>

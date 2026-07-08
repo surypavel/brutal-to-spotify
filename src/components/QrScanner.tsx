@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
-import { Alert, Button, FileButton, Group, Stack, Text } from '@mantine/core'
+import { Alert, Button, FileButton, Group, Stack } from '@mantine/core'
 import { IconCamera, IconUpload, IconX } from '@tabler/icons-react'
 
 const SCANNER_ELEMENT_ID = 'qr-scanner-region'
@@ -67,7 +67,10 @@ export function QrScanner({ onScan }: QrScannerProps) {
 
   return (
     <Stack gap="md">
-      <div id={SCANNER_ELEMENT_ID} style={{ width: '100%', maxWidth: 360, margin: '0 auto' }} />
+      <div
+        id={SCANNER_ELEMENT_ID}
+        style={{ width: '100%', maxWidth: 360, margin: '0 auto', borderRadius: 12, overflow: 'hidden' }}
+      />
       {error && (
         <Alert color="red" icon={<IconX size={16} />}>
           {error}
@@ -75,7 +78,7 @@ export function QrScanner({ onScan }: QrScannerProps) {
       )}
       <Group justify="center">
         {!isScanning ? (
-          <Button leftSection={<IconCamera size={16} />} onClick={() => void startCamera()}>
+          <Button color="gold" leftSection={<IconCamera size={16} />} onClick={() => void startCamera()}>
             Scan with camera
           </Button>
         ) : (
@@ -85,15 +88,12 @@ export function QrScanner({ onScan }: QrScannerProps) {
         )}
         <FileButton onChange={(file) => void scanFile(file)} accept="image/*">
           {(props) => (
-            <Button variant="light" leftSection={<IconUpload size={16} />} {...props}>
+            <Button variant="light" color="gold" leftSection={<IconUpload size={16} />} {...props}>
               Upload QR image
             </Button>
           )}
         </FileButton>
       </Group>
-      <Text size="sm" c="dimmed" ta="center">
-        Point your camera at a Brutal Assault badge QR code, or upload a photo of it.
-      </Text>
     </Stack>
   )
 }

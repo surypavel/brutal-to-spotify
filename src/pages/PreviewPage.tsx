@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query'
-import { Alert, Anchor, Badge, Button, Checkbox, Group, Loader, Stack, Text } from '@mantine/core'
+import { Alert, Anchor, Badge, Button, Checkbox, Group, Loader, Stack, Text, Title } from '@mantine/core'
 import { IconBrandSpotify } from '@tabler/icons-react'
 import { getCurrentFriend, setCurrentFriendPlaylist } from '../lib/currentFriend'
 import * as spotifyApi from '../lib/spotifyApi'
@@ -112,6 +112,19 @@ export function PreviewPage({ friend }: PreviewPageProps) {
 
   return (
     <Stack gap="md">
+      <Stack gap={4}>
+        <Title order={3} tt="uppercase">
+          Pick the tracks
+        </Title>
+        <Text c="dimmed" size="sm">
+          Top tracks for every artist on{' '}
+          <Text span fw={600} c="gold.3">
+            {friend.friendName}
+          </Text>
+          &apos;s list — untick anything you&apos;d skip, then send it to Spotify.
+        </Text>
+      </Stack>
+
       {isResolvingTracks && (
         <Group>
           <Loader size="sm" />
@@ -125,7 +138,7 @@ export function PreviewPage({ friend }: PreviewPageProps) {
           return (
             <div key={artist.id}>
               <Group gap="xs">
-                <Text fw={600} size="sm">
+                <Text fw={700} size="sm" tt="uppercase" lts="0.04em" c="gold.2">
                   {artist.name}
                 </Text>
                 {match.isLoading && <Loader size="xs" />}
@@ -161,7 +174,8 @@ export function PreviewPage({ friend }: PreviewPageProps) {
 
       {!isResolvingTracks && (
         <Button
-          leftSection={<IconBrandSpotify size={16} />}
+          size="md"
+          leftSection={<IconBrandSpotify size={20} />}
           onClick={() => playlistMutation.mutate()}
           loading={playlistMutation.isPending}
           disabled={checkedTrackUris.length === 0}

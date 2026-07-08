@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Container, Group, Loader, Stack, Text, Title } from '@mantine/core'
-import { IconMusic } from '@tabler/icons-react'
+import { Alert, Badge, Button, Container, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core'
+import { IconCheck } from '@tabler/icons-react'
 import { ScanPage } from './pages/ScanPage'
 import { ConnectPage } from './pages/ConnectPage'
 import { PreviewPage } from './pages/PreviewPage'
@@ -9,6 +9,28 @@ import { fetchFriendLineup, takePendingLineup, type FriendLineup } from './lib/f
 import { resetFestivalIdentity } from './lib/festivalApi'
 import { clearCurrentFriend, getCurrentFriend, setCurrentFriend } from './lib/currentFriend'
 import * as spotifyAuth from './lib/spotifyAuth'
+
+const STEPS = ['Scan badge', 'Connect Spotify', 'Build playlist']
+
+function StepIndicator({ current }: { current: number }) {
+  return (
+    <Group gap="xs">
+      {STEPS.map((label, index) => {
+        const state = index < current ? 'done' : index === current ? 'active' : 'todo'
+        return (
+          <Badge
+            key={label}
+            variant={state === 'active' ? 'filled' : state === 'done' ? 'light' : 'outline'}
+            color={state === 'todo' ? 'gray' : index === 0 ? 'gold' : 'spotify'}
+            leftSection={state === 'done' ? <IconCheck size={12} /> : undefined}
+          >
+            {index + 1}. {label}
+          </Badge>
+        )
+      })}
+    </Group>
+  )
+}
 
 // The app is three pages resolved from two facts: no friend yet → scan; friend but no Spotify
 // session → connect; both → preview.
@@ -67,34 +89,47 @@ function App() {
     return (
       <Container size="sm" py="xl">
         <Group>
-          <Loader size="sm" />
-          <Text size="sm">Loading…</Text>
+          <Loader size="sm" color="gold" />
+          <Text size="sm" c="dimmed">
+            Loading…
+          </Text>
         </Group>
       </Container>
     )
   }
 
+  const currentStep = !friend ? 0 : !loggedIn ? 1 : 2
+
   return (
     <Container size="sm" py="xl">
       <Stack gap="lg">
-        <Group gap="xs">
-          <IconMusic size={28} />
-          <Title order={2}>Brutal Assault → Spotify</Title>
-        </Group>
-        <Text c="dimmed">Scan a festival badge QR code and turn its favourited artists into a Spotify playlist.</Text>
+        <Stack gap="sm">
+          <Title order={1} fz={{ base: 38, sm: 52 }} lh={1.05} tt="uppercase">
+            <span className="brand-gold">Brutal Assault</span>{' '}
+            <span className="brand-green" style={{ whiteSpace: 'nowrap' }}>
+              → Spotify
+            </span>
+          </Title>
+          <StepIndicator current={currentStep} />
+        </Stack>
 
         {bootstrapError && <Alert color="red">{bootstrapError}</Alert>}
 
-        {!friend ? (
-          <ScanPage onScanned={handleScanned} />
-        ) : !loggedIn ? (
-          <ConnectPage friend={friend} />
-        ) : (
-          <PreviewPage friend={friend} />
-        )}
+        <Paper withBorder radius="lg" p="lg" bg="dark.6">
+          {!friend ? (
+            <ScanPage onScanned={handleScanned} />
+          ) : !loggedIn ? (
+            <ConnectPage friend={friend} />
+          ) : (
+            <PreviewPage friend={friend} />
+          )}
+        </Paper>
 
-        <Group justify="flex-end">
-          <Button variant="subtle" size="xs" c="dimmed" onClick={switchAccount}>
+        <Group justify="space-between">
+          <Text size="xs" c="dimmed">
+            Unofficial fan tool — not affiliated with Brutal Assault or Spotify.
+          </Text>
+          <Button variant="subtle" color="gray" size="xs" onClick={switchAccount}>
             Switch account
           </Button>
         </Group>
