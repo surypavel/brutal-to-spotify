@@ -27,6 +27,7 @@ jobs:
       - run: npm run build
         env:
           VITE_SPOTIFY_CLIENT_ID: ${{ vars.VITE_SPOTIFY_CLIENT_ID }}
+          VITE_SPOTIFY_REDIRECT_URI: ${{ vars.VITE_SPOTIFY_REDIRECT_URI }}
           VITE_FESTIVAL_API_BASE: ${{ vars.VITE_FESTIVAL_API_BASE }}
       - uses: actions/upload-pages-artifact@v3
         with:
